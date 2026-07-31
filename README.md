@@ -1,97 +1,118 @@
-<h1 align="center">
-  🚀 LinkedIn PostPilot
-</h1>
+<div align="center">
 
-<p align="center">
-  <b>An AI-powered agentic pipeline that autonomously writes, reviews, and refines LinkedIn posts — until they're publish-ready.</b>
-</p>
+# ✈️ LinkedIn PostPilot
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/LangGraph-Agentic%20Graph-7C3AED?style=for-the-badge&logo=langchain&logoColor=white" />
-  <img src="https://img.shields.io/badge/Gemini-AI%20Writer-4285F4?style=for-the-badge&logo=google&logoColor=white" />
-  <img src="https://img.shields.io/badge/Groq-AI%20Reviewer-F97316?style=for-the-badge&logo=groq&logoColor=white" />
-  <img src="https://img.shields.io/badge/Tavily-Web%20Search-10B981?style=for-the-badge" />
-</p>
+### *Your AI-powered LinkedIn content team — in a terminal.*
 
----
+An agentic pipeline that **researches the web → writes a post → reviews it → iterates** — autonomously, until the content is publish-ready.
 
-## ✨ What is LinkedIn PostPilot?
+<br/>
 
-**LinkedIn PostPilot** is an **agentic AI system** built with [LangGraph](https://github.com/langchain-ai/langgraph) that acts as your personal LinkedIn content team. You give it a topic — it handles the rest:
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agentic%20Graph-7C3AED?style=for-the-badge&logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
+[![Gemini](https://img.shields.io/badge/Gemini-AI%20Writer-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
+[![Groq](https://img.shields.io/badge/Groq-AI%20Reviewer-F97316?style=for-the-badge)](https://groq.com/)
+[![Tavily](https://img.shields.io/badge/Tavily-Web%20Search-10B981?style=for-the-badge)](https://tavily.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-Run%20Metrics-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 
-- 🔍 **Researches** the web for fresh, current information using Tavily
-- ✍️ **Writes** a compelling LinkedIn post using Google Gemini
-- 🧐 **Reviews** the draft with a strict AI reviewer powered by Groq (LLaMA 3.3)
-- 🔄 **Iterates** up to 3 times until the post passes quality checks
-- ✅ **Delivers** a polished, publish-ready LinkedIn post
-
-> No hashtags. No fluff. Just high-quality, human-sounding content.
+</div>
 
 ---
 
-## 🧠 How It Works — The Agentic Pipeline
+## ✨ What It Does
+
+You type a topic. PostPilot handles everything else:
+
+| Step | Agent | What happens |
+|------|-------|-------------|
+| 🔍 **Research** | Tavily Search | Fetches up-to-date stats, trends, and context |
+| ✍️ **Write** | Gemini (Writer) | Crafts a compelling LinkedIn post from the research |
+| 🧐 **Review** | LLaMA 3.3 (Reviewer) | Scores the draft against 7 strict quality criteria |
+| 🔄 **Refine** | Gemini (Writer) | Rewrites the post based on reviewer feedback |
+| ✅ **Deliver** | — | Outputs a polished, publish-ready post |
+| 📊 **Track** | SQLite | Logs latency, tokens, cost, and approval rate per run |
+
+> No hashtags. No fluff. Just sharp, human-sounding LinkedIn content.
+
+---
+
+## 🧠 Agentic Pipeline
 
 ```
- User Input (Topic)
-        │
-        ▼
-  ┌──────────────┐       uses web search?
-  │  🖊️  Writer   │──────────────────────────┐
-  │   (Gemini)   │                          ▼
-  └──────────────┘               ┌─────────────────────┐
-        │                        │  🌐 Tavily Web Search │
-        │ (draft ready)          └─────────────────────┘
-        ▼                                   │
-  ┌──────────────┐                          │
-  │ Extract Draft│◄─────────────────────────┘
-  └──────────────┘
-        │
-        ▼
-  ┌──────────────┐
-  │  🔍 Reviewer  │  (Groq / LLaMA 3.3 70B)
-  │              │
-  └──────┬───────┘
-         │
-    ┌────┴────┐
-    │ VERDICT │
-    └────┬────┘
-         │
-   ✅ APPROVED ──────────────────► Final Post 🎉
-         │
-   ❌ REJECTED ──────────────────► Back to Writer
-         │                        (up to 3 attempts)
-         └──────────────────────► MAX ATTEMPTS ► Final Post
+  ┌─────────────────────────────────────────────────────────┐
+  │                   User inputs a topic                   │
+  └───────────────────────────┬─────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  ✍️  Writer Node  │  ← Gemini
+                    │  (builds prompt) │
+                    └────────┬────────┘
+                             │
+               ┌─────────────┴──────────────┐
+               │  Does it need web search?   │
+               └─────────┬──────────────────┘
+           Yes ◄──────────┘          └──────────► No
+            │                                     │
+            ▼                                     │
+  ┌──────────────────┐                            │
+  │ 🌐 Tavily Search  │                            │
+  └────────┬─────────┘                            │
+           │  (results added to messages)          │
+           ▼                                      │
+  ┌─────────────────┐                             │
+  │  ✍️  Writer Node  │  ← generates post          │
+  │  (reads results) │     from search data        │
+  └────────┬─────────┘                            │
+           │                                      │
+           └─────────────────┬────────────────────┘
+                             │
+                             ▼
+                  ┌──────────────────┐
+                  │  📋 Extract Draft │
+                  └────────┬─────────┘
+                           │
+                           ▼
+                  ┌──────────────────┐
+                  │  🔍 Reviewer Node │  ← LLaMA 3.3 / Groq
+                  └────────┬─────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+         ✅ APPROVED               ❌ REJECTED
+              │                         │
+              ▼                         ▼
+       Final Post 🎉          Back to Writer Node
+                              (up to MAX_ATTEMPTS)
 ```
-
-The graph enforces **quality gates** — the post is only output when it meets all 7 content criteria or the max iteration limit is reached.
 
 ---
 
-## 🏆 Content Quality Criteria (Auto-Enforced)
+## 🏆 Quality Criteria (Auto-Enforced)
 
-The AI reviewer checks every draft against these strict standards:
+The reviewer rejects any draft that fails even **one** of these:
 
-| # | Criterion | Description |
-|---|-----------|-------------|
+| # | Criterion | Standard |
+|---|-----------|----------|
 | 1 | **Strong Hook** | First line must grab attention immediately |
-| 2 | **Clear Takeaway** | One valuable, actionable insight |
-| 3 | **Skimmable Format** | Short paragraphs, easy to read |
-| 4 | **Ideal Length** | 150–200 words — not too short, not too long |
-| 5 | **Engaging Ending** | Closes with a question or call-to-action |
-| 6 | **Human Tone** | Professional, but not robotic or corporate |
+| 2 | **Clear Takeaway** | One sharp, actionable insight |
+| 3 | **Skimmable** | Short paragraphs — easy to skim |
+| 4 | **Ideal Length** | 150–200 words, no padding |
+| 5 | **Engaging Ending** | Closes with a question or CTA |
+| 6 | **Human Tone** | Professional, not robotic or corporate |
 | 7 | **No Hashtags** | Clean, algorithm-independent content |
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Orchestration** | [LangGraph](https://github.com/langchain-ai/langgraph) | Agentic graph state machine |
-| **Writer LLM** | Google Gemini (`gemini-3.1-pro-preview`) | Content generation |
-| **Reviewer LLM** | Groq / LLaMA 3.3 70B Versatile | Quality review & feedback |
-| **Web Search** | [Tavily](https://tavily.com) | Real-time web research |
+| Layer | Technology | Role |
+|-------|-----------|------|
+| **Orchestration** | [LangGraph](https://github.com/langchain-ai/langgraph) | State-machine agentic graph |
+| **Writer LLM** | Google Gemini (`gemini-3.5-flash-lite`) | Post generation |
+| **Reviewer LLM** | Groq / LLaMA 3.3 70B Versatile | Quality gating & feedback |
+| **Web Search** | [Tavily](https://tavily.com) | Real-time research |
+| **Metrics** | SQLite (`data/metrics.db`) | Latency, tokens, cost, approval |
 | **Framework** | LangChain | LLM & tool integrations |
 | **Config** | `python-dotenv` | Secure API key management |
 
@@ -100,160 +121,222 @@ The AI reviewer checks every draft against these strict standards:
 ## 📁 Project Structure
 
 ```
-linkedin-postpilot/
+Linkedin_PostPilot/
 │
-├── main.py              # 🧠 Core agentic pipeline (writer → reviewer → loop)
-├── main_test.py         # 🧪 Tests
-├── requirements.txt     # 📦 Python dependencies
-├── .env                 # 🔑 API keys (not committed to Git)
-├── .gitignore           # 🙈 Git ignore rules
-└── README.md            # 📖 You are here!
+├── run.py                   # 🚀 Entry point  →  python run.py
+│
+├── app/                     # Core pipeline (modular)
+│   ├── __init__.py
+│   ├── config.py            # Env vars, model names, MAX_ATTEMPTS
+│   ├── state.py             # LangGraph State (TypedDict)
+│   ├── prompts.py           # Writer & reviewer system prompts
+│   ├── llms.py              # LLM + Tavily tool initialization
+│   ├── nodes.py             # writer_node, reviewer_node, routers
+│   ├── graph.py             # Graph construction & compilation
+│   └── main.py              # run_cli() — CLI entry function
+│
+├── tracking/                # Run metrics & SQLite persistence
+│   ├── db.py                # Schema, migrations, read helpers
+│   └── metrics.py           # RunMetrics class, log_call(), get_usage()
+│
+├── data/
+│   └── metrics.db           # SQLite DB (auto-created on first run)
+│
+├── requirements.txt
+├── .env                     # 🔑 API keys (never committed)
+└── .gitignore
 ```
 
 ---
 
 ## ⚡ Quick Start
 
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/linkedin-postpilot.git
-cd linkedin-postpilot
+git clone https://github.com/subhamkumar5456/Linkedin_PostPilot.git
+cd Linkedin_PostPilot
 ```
 
-### 2. Set Up a Virtual Environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate       # macOS / Linux
-# .venv\Scripts\activate        # Windows
+source .venv/bin/activate        # macOS / Linux
+# .venv\Scripts\activate         # Windows
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure API Keys
+### 4. Add API keys
 
 Create a `.env` file in the project root:
 
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
-GROQ_API_KEY=your_groq_api_key_here
-TAVILY_API_KEY=your_tavily_api_key_here
+GOOGLE_API_KEY=your_google_api_key
+GROQ_API_KEY=your_groq_api_key
+TAVILY_API_KEY=your_tavily_api_key
+
+# Optional overrides (defaults shown)
+WRITER_MODEL=gemini-3.5-flash-lite
+REVIEWER_MODEL=llama-3.3-70b-versatile
+MAX_ATTEMPTS=3
 ```
 
-> 🔑 **Get your keys:**
+> 🔑 **Get your free keys:**
 > - **Google Gemini** → [aistudio.google.com](https://aistudio.google.com/app/apikey)
 > - **Groq** → [console.groq.com](https://console.groq.com/keys)
-> - **Tavily** → [tavily.com](https://tavily.com)
+> - **Tavily** → [app.tavily.com](https://app.tavily.com)
 
-### 5. Run the App
+### 5. Run
 
 ```bash
-python main.py
+python run.py
 ```
 
-**Example session:**
+---
+
+## 🖥️ Example Session
 
 ```
-═══════════════════════════════════════════════════════
+=======================================================
 Welcome to the LinkedIn Post Generator
-═══════════════════════════════════════════════════════
+=======================================================
 
 This tool will draft a LinkedIn post for you, review it
 itself, and iterate until it's publish-ready.
-
-═══════════════════════════════════════════════════════
+=======================================================
 
 What topic do you want a LinkedIn post about?
 > The rise of agentic AI in 2025
 
 Starting generation...
 
-  Generated Post:
-  ...
-
-[Verdict: APPROVED]
-
-═══════════════════════════════════════════════════════
-FINAL LINKEDIN POST
-═══════════════════════════════════════════════════════
+ generated Post :
+"Agentic AI isn't the future — it's already your coworker."
 ...
-Total attempts: 2
+
+[Verdict:APPROVED]
+[Feedback: Strong hook, clear takeaway, well-structured...]
+
+Post has been ✅ approved
+
+=======================================================
+FINAL LINKEDIN POST
+=======================================================
+"Agentic AI isn't the future — it's already your coworker."
+...
+=======================================================
+Total attempts: 1
 Approved: True
+
+=======================================================
+RUN METRICS
+=======================================================
+run_id:            20260801_033300_481321
+topic:             The rise of agentic AI in 2025
+attempts_used:     1
+approved:          True
+one_shot_approval: True
+total_latency_s:   3.565
+total_tokens:      5025
+num_llm_calls:     2
+
+All metrics stored in SQLite at: data/metrics.db
 ```
 
 ---
 
-## 🔄 Agent State Machine
+## 📊 Run Metrics
 
-The pipeline is powered by a **LangGraph `StateGraph`** with the following state:
+Every run is automatically tracked in `data/metrics.db`. Query it any time:
 
-```python
-class State(TypedDict):
-    topic           : str       # Your input topic
-    messages        : list      # Conversation history
-    draft           : str       # Current post draft
-    review_feedback : str       # Reviewer's feedback
-    is_approved     : bool      # Approval flag
-    attempt         : int       # Iteration counter (max: 3)
+```bash
+# All runs summary
+sqlite3 data/metrics.db "SELECT run_id, topic, attempts_used, approved, total_latency_s FROM runs ORDER BY created_at DESC;"
+
+# Per-call breakdown for a specific run
+sqlite3 data/metrics.db "SELECT node, attempt, latency_s, total_tokens, verdict FROM llm_calls WHERE run_id='<run_id>';"
+
+# Approval rate across all runs
+sqlite3 data/metrics.db "SELECT ROUND(AVG(approved)*100,1) || '%' AS approval_rate FROM runs;"
 ```
 
 ---
 
 ## 🌐 Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GOOGLE_API_KEY` | ✅ Yes | For Gemini writer LLM |
-| `GROQ_API_KEY` | ✅ Yes | For LLaMA reviewer LLM |
-| `TAVILY_API_KEY` | ✅ Yes | For web search tool |
-| `MISTRAL_API_KEY` | Optional | Reserved for future use |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GOOGLE_API_KEY` | ✅ | — | Gemini writer LLM |
+| `GROQ_API_KEY` | ✅ | — | LLaMA reviewer LLM |
+| `TAVILY_API_KEY` | ✅ | — | Web search tool |
+| `WRITER_MODEL` | ☑️ | `gemini-3.5-flash-lite` | Override writer model |
+| `REVIEWER_MODEL` | ☑️ | `llama-3.3-70b-versatile` | Override reviewer model |
+| `MAX_ATTEMPTS` | ☑️ | `3` | Max write→review iterations |
+
+---
+
+## 🔄 Agent State
+
+```python
+class State(TypedDict):
+    topic           : str    # Your input topic
+    messages        : list   # Full conversation history
+    draft           : str    # Current post draft
+    review_feedback : str    # Reviewer's last feedback
+    is_approved     : bool   # Whether the post passed review
+    attempt         : int    # Iteration counter (capped at MAX_ATTEMPTS)
+```
 
 ---
 
 ## 🚧 Roadmap
 
-- [ ] 🌐 Add a web UI (Streamlit / FastAPI frontend)
-- [ ] 📅 Schedule post generation on a cron
-- [ ] 🎨 Support multiple post styles (storytelling, listicle, thought leadership)
-- [ ] 🔗 LinkedIn API integration for direct posting
-- [ ] 📊 Analytics: track engagement of generated posts
-- [ ] 🗂️ Post history & saved drafts
+- [ ] 🌐 Web UI (Streamlit or FastAPI frontend)
+- [ ] 📅 Scheduled generation via cron
+- [ ] 🎨 Multiple post styles: storytelling, listicle, thought leadership
+- [ ] 🔗 LinkedIn API integration for direct publishing
+- [ ] 📈 Engagement analytics for generated posts
+- [ ] 🗂️ Post history and saved drafts
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to:
+Contributions are welcome!
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit: `git commit -m "Add your feature"`
+4. Push: `git push origin feature/your-feature`
 5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## 🙏 Acknowledgements
 
-- [LangChain](https://github.com/langchain-ai/langchain) & [LangGraph](https://github.com/langchain-ai/langgraph) for the agentic framework
-- [Google Gemini](https://deepmind.google/technologies/gemini/) for state-of-the-art content generation
-- [Groq](https://groq.com/) for blazing-fast inference
-- [Tavily](https://tavily.com/) for real-time web search
+- [LangGraph](https://github.com/langchain-ai/langgraph) — for the agentic state-machine framework
+- [Google Gemini](https://deepmind.google/technologies/gemini/) — for state-of-the-art content generation
+- [Groq](https://groq.com/) — for blazing-fast LLaMA inference
+- [Tavily](https://tavily.com/) — for real-time web search
 
 ---
 
-<p align="center">
-  Built with ❤️ by <b>Subham Kumar</b> &nbsp;|&nbsp;
-  <a href="https://www.linkedin.com/in/subhamkumar5456">LinkedIn</a>
-</p>
+<div align="center">
+
+Built with ❤️ by **Subham Kumar** &nbsp;|&nbsp;
+[LinkedIn](https://www.linkedin.com/in/subhamkumar5456) &nbsp;|&nbsp;
+[GitHub](https://github.com/subhamkumar5456)
+
+</div>
