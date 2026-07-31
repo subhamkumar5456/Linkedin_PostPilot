@@ -7,7 +7,7 @@ WRITER_SYSTEM_PROMPT = (
     "previous draft, carefully address every point in the new draft. "
     "Rules for good LinkedIn posts: strong hook in the first line, "
     "1 clear takeaway, easy to skim (short paragraphs), around "
-    "150-200 words, ends with a question or call-to-action to invite "
+    "150–200 words, ends with a question or call-to-action to invite "
     "engagement. Do not use hashtags."
 )
 

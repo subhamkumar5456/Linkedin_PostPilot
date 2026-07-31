@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     total_tokens    INTEGER,
     est_cost_usd    REAL,
     verdict         TEXT,
+    error           TEXT,
     timestamp       TEXT,
     FOREIGN KEY (run_id) REFERENCES runs (run_id)
 );
@@ -110,7 +111,56 @@ def overall_stats() -> dict:
             """
         )
         row = cur.fetchone()
-        return dict(row) if row else {}
+        stats = dict(row) if row else {}
+
+        cur.execute(
+            """
+            SELECT
+                COUNT(*)                                          AS total_calls,
+                SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) AS error_calls
+            FROM llm_calls
+            """
+        )
+        call_row = cur.fetchone()
+        if call_row and call_row["total_calls"]:
+            stats["error_rate_pct"] = round(
+                100.0 * call_row["error_calls"] / call_row["total_calls"], 2
+            )
+        else:
+            stats["error_rate_pct"] = 0.0
+        return stats
+
+
+
+# ---------------------------------------------------------------------------
+# Schema migrations — safely adds any columns present in SCHEMA but missing
+# from the live DB. Runs on every startup; it's a no-op when the schema is
+# already up-to-date, so it adds zero overhead in the normal case.
+# ---------------------------------------------------------------------------
+
+_EXPECTED_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "llm_calls": [
+        ("verdict", "TEXT"),
+        ("error",   "TEXT"),
+    ],
+    "runs": [],
+}
+
+
+def _migrate_db() -> None:
+    with get_connection() as conn:
+        for table, columns in _EXPECTED_COLUMNS.items():
+            existing = {
+                row[1]
+                for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            for col_name, col_type in columns:
+                if col_name not in existing:
+                    conn.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"
+                    )
+                    print(f"[db] migrated: added column '{col_name}' to '{table}'")
 
 
 init_db()
+_migrate_db()

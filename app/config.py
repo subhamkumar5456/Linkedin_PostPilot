@@ -9,5 +9,5 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 MAX_ATTEMPTS = int(os.getenv("MAX_ATTEMPTS", "3"))
 
-WRITER_MODEL = os.getenv("WRITER_MODEL", "gemini-3.1-pro-preview")
+WRITER_MODEL = os.getenv("WRITER_MODEL", "gemini-3.5-flash-lite")
 REVIEWER_MODEL = os.getenv("REVIEWER_MODEL", "llama-3.3-70b-versatile")

@@ -12,25 +12,22 @@ from tracking.metrics import get_current_run, get_usage, looks_like_refusal
 tool_node = ToolNode(tools)
 
 
+
 def writer_node(state: State) -> dict:
-    """Writes (or rewrites) the draft, or continues after a tool call."""
+    """Writes (or rewrites) the draft and can call tavily tool for web search first."""
     metrics = get_current_run()
     messages_so_far = state.get("messages", [])
 
-    # Continuing a tool-calling turn: the last message is a tool result,
-    # so we hand the whole running history back to the LLM instead of
-    # re-building a fresh prompt (fix for the original tools->reviewer
-    # dead-end, which skipped extract_draft entirely).
+    # Continuing after a tool call: hand the full running history back to
+    # the LLM so it can write the post using the search results it fetched.
     if messages_so_far and getattr(messages_so_far[-1], "type", None) == "tool":
         t0 = time.perf_counter()
         response = writer_llm_with_tools.invoke(
             [("system", WRITER_SYSTEM_PROMPT)] + messages_so_far
         )
         latency = time.perf_counter() - t0
-        metrics.log_call(
-            "writer_after_tools", state.get("attempt", 1), "gemini-writer",
-            latency, get_usage(response),
-        )
+        metrics.log_call("writer_after_tools", state.get("attempt", 1),
+                         "gemini-writer", latency, get_usage(response))
         if looks_like_refusal(response.content):
             metrics.refusal_flagged = True
         return {"messages": [response]}
@@ -41,14 +38,14 @@ def writer_node(state: State) -> dict:
 
     if attempt == 1:
         user_message = (
-            f"Write a linkedin Post on this topic : {topic} "
+            f"Write a linkedin Post on this topic : {topic}"
             f"if you need the current info search the web first"
         )
     else:
         user_message = (
             f"your previous post was rejected "
             f"here is the reviewer's feedback \n\n {previous_feedback}"
-            f"write a new, improvised draft that fixes every issue mentioned "
+            f"write a new, impovised draft that fixes every issue mentioned "
             f"do not repeat the same mistake"
         )
 
@@ -68,10 +65,10 @@ def writer_node(state: State) -> dict:
 
 
 def extract_draft_node(state: State) -> dict:
-    """After the writer llm finishes tool calls, pulls the final text out."""
+    """After the writer llm finishes tool calls, pulls the final text out of graph."""
     last_message = state["messages"][-1]
     draft = last_message.content
-    print(f"\n\nGenerated Post:\n{draft}\n")
+    print(f"\n\n generated Post : \n{draft}\n")
     return {"draft": draft}
 
 
@@ -80,7 +77,11 @@ def reviewer_node(state: State) -> dict:
     metrics = get_current_run()
     draft = state["draft"]
 
-    prompt = f"review this linkedin post draft\n{draft}\ngive your reviews"
+    prompt = (
+        f"review this linkedin post draft"
+        f"{draft}\n"
+        f"give your reviews"
+    )
 
     t0 = time.perf_counter()
     response = reviewer_llm.invoke(
@@ -98,16 +99,13 @@ def reviewer_node(state: State) -> dict:
         feedback = review_text
 
     verdict = "APPROVED" if is_approved else "REJECTED"
-
-    metrics.log_call(
-        "reviewer", state.get("attempt", 1), "groq-reviewer", latency, usage,
-        extra={"verdict": verdict},
-    )
+    metrics.log_call("reviewer", state.get("attempt", 1), "groq-reviewer",
+                     latency, usage, extra={"verdict": verdict})
     if looks_like_refusal(feedback):
         metrics.refusal_flagged = True
 
-    print(f"[Verdict: {verdict}]")
-    print(f"[Feedback: {feedback}]")
+    print(f"[Verdict:{verdict}]")
+    print(f"[Feedback:{feedback}]")
 
     return {
         "review_feedback": feedback,
@@ -124,7 +122,7 @@ def should_use_tool(state: State):
 
 def should_stop_looping(state: State):
     if state["is_approved"]:
-        print("Post has been approved")
+        print("Post has been ✅ approved")
         return END
     if state["attempt"] >= MAX_ATTEMPTS:
         print("Reached max attempts")

@@ -10,7 +10,6 @@ tools = [search_tool]
 
 writer_llm = ChatGoogleGenerativeAI(
     model=WRITER_MODEL,
-    temperature=0.7,
     google_api_key=GOOGLE_API_KEY,
 )
 writer_llm_with_tools = writer_llm.bind_tools(tools)

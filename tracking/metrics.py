@@ -73,11 +73,22 @@ def get_current_run() -> "RunMetrics":
     return m
 
 
-def looks_like_refusal(text: str) -> bool:
+def looks_like_refusal(text) -> bool:
     """Cheap keyword heuristic — catches obvious refusals/non-answers,
-    not a real classifier."""
+    not a real classifier.
+
+    Handles both plain str and list-of-parts (returned by models when
+    they emit tool calls alongside text content).
+    """
     if not text:
         return False
+    # When the model makes a tool call, content is a list of dicts:
+    # [{'type': 'text', 'text': '...'}, {'type': 'tool_use', ...}]
+    if isinstance(text, list):
+        text = " ".join(
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in text
+        )
     lowered = text.lower()
     return any(p in lowered for p in REFUSAL_PATTERNS)
 
@@ -92,6 +103,9 @@ def get_usage(response) -> dict:
         "output_tokens": usage.get("output_tokens", 0),
         "total_tokens": usage.get("total_tokens", 0),
     }
+
+
+ZERO_USAGE = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
 
 def estimate_cost(model_key: str, usage: dict) -> float:
@@ -111,6 +125,8 @@ class RunMetrics:
         self.refusal_flagged = False
 
     def log_call(self, node, attempt, model_key, latency_s, usage, extra=None):
+        extra = extra or {}
+        error = extra.get("error")
         entry = {
             "run_id": self.run_id,
             "node": node,
@@ -121,26 +137,29 @@ class RunMetrics:
             "output_tokens": usage["output_tokens"],
             "total_tokens": usage["total_tokens"],
             "est_cost_usd": round(estimate_cost(model_key, usage), 6),
-            "verdict": (extra or {}).get("verdict"),
+            "verdict": extra.get("verdict"),
+            "error": (str(error)[:500] if error else None),
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }
         self.calls.append(entry)
 
         # Write immediately, not just at save() — so a long/streaming run
-        # is inspectable in the DB before it finishes.
+        # is inspectable in the DB before it finishes, and so a call that
+        # fails and is never retried again still leaves a record.
         with db_cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO llm_calls
                     (run_id, node, attempt, model, latency_s, input_tokens,
-                     output_tokens, total_tokens, est_cost_usd, verdict, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     output_tokens, total_tokens, est_cost_usd, verdict, error, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry["run_id"], entry["node"], entry["attempt"],
                     entry["model"], entry["latency_s"], entry["input_tokens"],
                     entry["output_tokens"], entry["total_tokens"],
-                    entry["est_cost_usd"], entry["verdict"], entry["timestamp"],
+                    entry["est_cost_usd"], entry["verdict"], entry["error"],
+                    entry["timestamp"],
                 ),
             )
         return entry
