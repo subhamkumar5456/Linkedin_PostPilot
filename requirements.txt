@@ -1,5 +1,5 @@
 # Core LangChain
-LangChain
+langchain
 langchain-core
 
 # LangGraph
@@ -8,6 +8,7 @@ langgraph
 # LLM Providers
 langchain-google-genai
 langchain-groq
+
 # Search Tool
 langchain-tavily
 
