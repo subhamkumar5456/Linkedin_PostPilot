@@ -1,0 +1,18 @@
+# Core LangChain
+LangChain
+langchain-core
+
+# LangGraph
+langgraph
+
+# LLM Providers
+langchain-google-genai
+langchain-groq
+# Search Tool
+langchain-tavily
+
+# Environment Variables
+python-dotenv
+
+# Google AI SDK
+google-generativeai
