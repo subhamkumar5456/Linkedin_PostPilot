@@ -1,5 +1,3 @@
-import time
-
 from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 
@@ -7,29 +5,24 @@ from .state import State
 from .llms import writer_llm_with_tools, reviewer_llm, tools
 from .prompts import WRITER_SYSTEM_PROMPT, REVIEWER_SYSTEM_PROMPT
 from .config import MAX_ATTEMPTS
-from tracking.metrics import get_current_run, get_usage, looks_like_refusal
+from tracking.metrics import get_current_run
+from tracking.db import db_cursor
 
 tool_node = ToolNode(tools)
 
 
-
 def writer_node(state: State) -> dict:
     """Writes (or rewrites) the draft and can call tavily tool for web search first."""
-    metrics = get_current_run()
     messages_so_far = state.get("messages", [])
 
     # Continuing after a tool call: hand the full running history back to
     # the LLM so it can write the post using the search results it fetched.
     if messages_so_far and getattr(messages_so_far[-1], "type", None) == "tool":
-        t0 = time.perf_counter()
         response = writer_llm_with_tools.invoke(
-            [("system", WRITER_SYSTEM_PROMPT)] + messages_so_far
+            [("system", WRITER_SYSTEM_PROMPT)] + messages_so_far,
+            _node="writer_after_tools",
+            _attempt=state.get("attempt", 1),
         )
-        latency = time.perf_counter() - t0
-        metrics.log_call("writer_after_tools", state.get("attempt", 1),
-                         "gemini-writer", latency, get_usage(response))
-        if looks_like_refusal(response.content):
-            metrics.refusal_flagged = True
         return {"messages": [response]}
 
     attempt = state.get("attempt", 0) + 1
@@ -51,12 +44,11 @@ def writer_node(state: State) -> dict:
 
     messages = [("system", WRITER_SYSTEM_PROMPT), ("human", user_message)]
 
-    t0 = time.perf_counter()
-    response = writer_llm_with_tools.invoke(messages)
-    latency = time.perf_counter() - t0
-    metrics.log_call("writer", attempt, "gemini-writer", latency, get_usage(response))
-    if looks_like_refusal(response.content):
-        metrics.refusal_flagged = True
+    response = writer_llm_with_tools.invoke(
+        messages,
+        _node="writer",
+        _attempt=attempt,
+    )
 
     return {
         "messages": [("human", user_message), response],
@@ -74,7 +66,6 @@ def extract_draft_node(state: State) -> dict:
 
 def reviewer_node(state: State) -> dict:
     """Reviews the draft and decides: approve or reject with feedback."""
-    metrics = get_current_run()
     draft = state["draft"]
 
     prompt = (
@@ -83,12 +74,10 @@ def reviewer_node(state: State) -> dict:
         f"give your reviews"
     )
 
-    t0 = time.perf_counter()
     response = reviewer_llm.invoke(
-        [("system", REVIEWER_SYSTEM_PROMPT), ("human", prompt)]
+        [("system", REVIEWER_SYSTEM_PROMPT), ("human", prompt)],
+        _attempt=state.get("attempt", 1),
     )
-    latency = time.perf_counter() - t0
-    usage = get_usage(response)
 
     review_text = response.content.strip()
     is_approved = "APPROVED" in review_text.upper().split("FEEDBACK")[0]
@@ -99,10 +88,31 @@ def reviewer_node(state: State) -> dict:
         feedback = review_text
 
     verdict = "APPROVED" if is_approved else "REJECTED"
-    metrics.log_call("reviewer", state.get("attempt", 1), "groq-reviewer",
-                     latency, usage, extra={"verdict": verdict})
-    if looks_like_refusal(feedback):
-        metrics.refusal_flagged = True
+
+    # Back-fill verdict into the call entry that TrackedLLM just recorded.
+    # The verdict isn't known until after the response, so we patch the last
+    # recorded call in-memory and update the DB row in one targeted write.
+    try:
+        run = get_current_run()
+        if run.calls:
+            run.calls[-1]["verdict"] = verdict
+            last_call = run.calls[-1]
+            with db_cursor() as cur:
+                # SQLite doesn't support ORDER BY/LIMIT in UPDATE directly;
+                # use a subquery to target only the most recent matching row.
+                cur.execute(
+                    """
+                    UPDATE llm_calls SET verdict = ?
+                    WHERE id = (
+                        SELECT id FROM llm_calls
+                        WHERE run_id = ? AND node = ? AND attempt = ?
+                        ORDER BY id DESC LIMIT 1
+                    )
+                    """,
+                    (verdict, last_call["run_id"], last_call["node"], last_call["attempt"]),
+                )
+    except RuntimeError:
+        pass  # no active run — non-fatal
 
     print(f"[Verdict:{verdict}]")
     print(f"[Feedback:{feedback}]")
@@ -111,7 +121,6 @@ def reviewer_node(state: State) -> dict:
         "review_feedback": feedback,
         "is_approved": is_approved,
     }
-
 
 def should_use_tool(state: State):
     last_message = state["messages"][-1]
